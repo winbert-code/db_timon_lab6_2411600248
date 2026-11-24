@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DB_Timon ER Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: "Segoe UI", sans-serif; margin: 24px; background: #fff; color: #222; }
+    h1 { margin-top: 0; }
+    .mermaid { border: 1px solid #ddd; border-radius: 8px; padding: 16px; background: #fafafa; }
+  </style>
+</head>
+<body>
+  <h1>DB_Timon — ER Diagram (Lab 6)</h1>
+  <pre class="mermaid">
+erDiagram
+    ROLES      ||--o{ USERS       : "assigned to"
+    USERS      ||--o| INSTRUCTORS : "has profile"
+    USERS      ||--o| STUDENTS    : "has profile"
+    INSTRUCTORS||--o{ COURSES     : "teaches"
+    STUDENTS   ||--o{ ENROLLMENTS : "enrolls in"
+    COURSES    ||--o{ ENROLLMENTS : "has"
+    STUDENTS   ||--o{ GRADES      : "receives"
+    COURSES    ||--o{ GRADES      : "graded in"
+    ASSIGNMENT_TYPES ||--o{ GRADES : "categorizes"
+    USERS            ||--o{ USER_SESSIONS    : "opens"
+    AUDIT_LOG        }o..o{ GRADES           : "records changes to"
+    USERS            ||--o{ AUDIT_LOG        : "app user (logical)"
+    BACKUP_HISTORY   }o..o{ AUDIT_LOG        : "reviewed with (logical)"
+
+    ROLES {
+        int role_id PK
+        string role_name UK
+    }
+    USERS {
+        int user_id PK
+        string username UK
+        string password_hash
+        int role_id FK
+    }
+    INSTRUCTORS {
+        int instructor_id PK
+        int user_id FK
+        string first_name
+        string last_name
+        string department
+    }
+    STUDENTS {
+        int student_id PK
+        int user_id FK
+        string first_name
+        string last_name
+        date date_of_birth
+    }
+    COURSES {
+        int course_id PK
+        string course_code UK
+        string course_name
+        int instructor_id FK
+    }
+    ENROLLMENTS {
+        int enrollment_id PK
+        int student_id FK
+        int course_id FK
+        datetime enrollment_date
+    }
+    ASSIGNMENT_TYPES {
+        int type_id PK
+        string type_name UK
+        decimal default_weight "NOT NULL DEFAULT 0.00, CHECK 0..100"
+    }
+    GRADES {
+        int student_id PK
+        int course_id PK
+        int type_id PK
+        decimal grade "NULL allowed, CHECK 0..100 (chk_grade_range)"
+        datetime date_recorded "DEFAULT CURRENT_TIMESTAMP"
+    }
+    AUDIT_LOG {
+        bigint audit_id PK
+        datetime event_time "idx_audit_time"
+        string db_user
+        string app_user "idx_audit_app_user"
+        string table_name "idx_audit_table_action"
+        string action_type "idx_audit_table_action"
+        string record_id
+        text old_values
+        text new_values
+        string host_name
+    }
+    BACKUP_HISTORY {
+        bigint backup_id PK
+        datetime backup_time
+        string backup_type
+        string file_name
+        string status
+        int rows_backed_up
+        string initiated_by
+        text notes
+    }
+    USER_SESSIONS {
+        char session_id PK
+        int user_id FK
+        string username
+        datetime login_time
+        datetime last_activity
+        datetime logout_time
+        string status "ACTIVE / TIMED_OUT / CLOSED"
+        string host_name
+    }
+  </pre>
+  <h2>Gradebook notes</h2>
+  <p>
+    <code>GRADES</code> is a ternary relationship with the composite primary key
+    <code>(student_id, course_id, type_id)</code>: one grade per student, per course,
+    per assignment type. It has three foreign keys, to <code>students</code>,
+    <code>courses</code> and <code>assignment_types</code>.
+    <code>assignment_types.default_weight</code> (CHECK 0..100) drives the weighted
+    final grade in <code>sp_CalculateCourseGrade</code>.
+  </p>
+  <h2>Views</h2>
+  <ul>
+    <li><code>student_grade_summary</code> — grades joined to students, courses and types (Student dashboard).</li>
+    <li><code>teacher_course_overview</code> — per-course/type submissions and average grades, with <code>user_id</code> for teacher filtering.</li>
+    <li><code>student_transcript</code> — enrollment-based transcript with weight, grade and instructor.</li>
+    <li><code>course_performance_analytics</code> — enrolled students, grades submitted, average/minimum/maximum grade per course.</li>
+  </ul>
+  <h2>Lab 5 indexes</h2>
+  <table border="1" cellpadding="6" cellspacing="0">
+    <tr><th>Index</th><th>Table</th><th>Columns</th><th>Purpose</th></tr>
+    <tr><td><code>idx_grades_student_course</code></td><td>grades</td><td>(student_id, course_id)</td><td>Fast per-student/per-course grade lookups and dashboards</td></tr>
+    <tr><td><code>idx_enrollments_date</code></td><td>enrollments</td><td>(enrollment_date)</td><td>Date-range enrollment searches and reports</td></tr>
+    <tr><td><code>idx_courses_code_name</code></td><td>courses</td><td>(course_code, course_name)</td><td>Course-code search and auto-complete</td></tr>
+  </table>
+  <p>
+    Note: the <code>grades</code> composite primary key already begins with
+    (student_id, course_id), so <code>idx_grades_student_course</code> shares that
+    leftmost prefix but is kept as an explicitly named dashboard access path.
+  </p>
+
+  <h2>Lab 6 — security, audit and session tables</h2>
+  <table border="1" cellpadding="6" cellspacing="0">
+    <tr><th>Object</th><th>Purpose</th><th>Key columns / notes</th></tr>
+    <tr><td><code>audit_log</code></td><td>Compliance record of critical data changes</td><td><code>event_time</code>, <code>db_user</code>, <code>app_user</code>, <code>table_name</code>, <code>action_type</code>, <code>old_values</code>, <code>new_values</code></td></tr>
+    <tr><td><code>backup_history</code></td><td>Log of manual/scheduled backups and their status</td><td><code>backup_time</code>, <code>file_name</code>, <code>status</code>, <code>initiated_by</code></td></tr>
+    <tr><td><code>user_sessions</code></td><td>Login/logout tracking and concurrent-login prevention</td><td><code>session_id</code>, <code>user_id</code>, <code>login_time</code>, <code>last_activity</code>, <code>status</code></td></tr>
+    <tr><td><code>v_active_sessions</code></td><td>Active sessions with computed <code>idle_minutes</code> / <code>session_state</code></td><td>30-minute timeout threshold</td></tr>
+  </table>
+
+  <h2>Lab 6 — database roles and triggers</h2>
+  <table border="1" cellpadding="6" cellspacing="0">
+    <tr><th>Database account</th><th>Privileges</th></tr>
+    <tr><td><code>dbt_admin</code></td><td>SELECT / INSERT / UPDATE / DELETE / EXECUTE on <code>DB_Timon.*</code></td></tr>
+    <tr><td><code>dbt_teacher</code></td><td>Read reference tables and views; INSERT / UPDATE / DELETE on <code>grades</code>; EXECUTE <code>sp_CalculateCourseGrade</code></td></tr>
+    <tr><td><code>dbt_student</code></td><td>SELECT only on <code>student_grade_summary</code>, <code>student_transcript</code>, <code>course_performance_analytics</code></td></tr>
+  </table>
+  <ul>
+    <li><code>tr_validate_grade_before_insert</code> / <code>tr_validate_grade_before_update</code> — enforce 0–100 and require an existing enrollment before a grade is written (<em>GRADES</em> annotation).</li>
+    <li><code>tr_grades_after_insert/update/delete</code> — write before/after JSON into <em>AUDIT_LOG</em> (<em>GRADES → AUDIT_LOG</em> relationship).</li>
+    <li><code>sp_RecordBackup</code>, <code>sp_MaintenanceRoutine</code>, <code>sp_TimeoutSessions</code> — backup logging, statistics refresh and session timeout maintenance.</li>
+  </ul>
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: "default" });
+  </script>
+</body>
+</html>

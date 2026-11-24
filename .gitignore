@@ -1,0 +1,17 @@
+# Build output
+**/bin/
+**/obj/
+**/.vs/
+
+# Local runtime secrets and generated backups
+**/App_Data/*.enc
+**/App_Data/backups/
+**/*.sql.bak
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Editor/Office temporary files
+~$*
+*.vbproj.user
