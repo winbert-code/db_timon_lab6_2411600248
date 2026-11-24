@@ -39,7 +39,6 @@ Namespace AcademicSystem
                     parameters)
 
                 If users.Rows.Count = 0 Then
-                    System.IO.File.AppendAllText("C:\Users\USER\AppData\Local\Temp\opencode\lab6_login_error.txt", "No user row" & vbCrLf)
                     lblStatus.ForeColor = Color.Firebrick
                     lblStatus.Text = "Invalid username or password."
                     txtPassword.Clear()
@@ -48,7 +47,6 @@ Namespace AcademicSystem
 
                 Dim row = users.Rows(0)
                 If Not PasswordHasher.VerifyPassword(password, Convert.ToString(row("password_hash"))) Then
-                    System.IO.File.AppendAllText("C:\Users\USER\AppData\Local\Temp\opencode\lab6_login_error.txt", "Hash verify failed for password length " & password.Length & vbCrLf)
                     lblStatus.ForeColor = Color.Firebrick
                     lblStatus.Text = "Invalid username or password."
                     txtPassword.Clear()
@@ -67,7 +65,6 @@ Namespace AcademicSystem
                 Try
                     Session.StartSession(userId, username, roleId, roleName)
                 Catch loginEx As InvalidOperationException
-                    System.IO.File.AppendAllText("C:\Users\USER\AppData\Local\Temp\opencode\lab6_login_error.txt", "StartSession: " & loginEx.Message & vbCrLf)
                     lblStatus.ForeColor = Color.Firebrick
                     lblStatus.Text = loginEx.Message
                     txtPassword.Clear()
@@ -103,7 +100,6 @@ Namespace AcademicSystem
                 nextForm.Show()
 
             Catch ex As Exception
-                System.IO.File.AppendAllText("C:\Users\USER\AppData\Local\Temp\opencode\lab6_login_error.txt", ex.ToString() & vbCrLf & "-----" & vbCrLf)
                 MessageBox.Show("Login failed: " & ex.Message, "Error",
                                 MessageBoxButtons.OK, MessageBoxIcon.Error)
                 txtPassword.Clear()
